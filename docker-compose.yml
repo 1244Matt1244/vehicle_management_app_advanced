@@ -1,0 +1,37 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: vehicleapp-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "YourStrong@Passw0rd"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sql_data:/var/opt/mssql
+      - ./src/VehicleApp.Api/Database/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/VehicleApp.Api/Database/entrypoint.sh:/entrypoint.sh
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $$MSSQL_SA_PASSWORD -C -Q 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
+  api:
+    build:
+      context: .
+      dockerfile: src/VehicleApp.Api/Dockerfile
+    container_name: vehicleapp-api
+    ports:
+      - "5000:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: "Server=db;Database=VehicleApp;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True;"
+
+volumes:
+  sql_data:
